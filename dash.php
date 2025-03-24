@@ -2,13 +2,13 @@
 /*
  * SS-DASH Configuration
  */
-$LOG_FILE = './misu2';  // Path to SvxLink log file
-$LINES = 30;                      // Number of lines to display
-$REFRESH = 2;                       // Refresh interval in seconds
-$TAIL_BUFFER = 8192;                    // Increased buffer for better tailing
+$LOG_FILE = './misu2'; // path to the log file
+$LINES = 30; // number of lines to display
+$REFRESH = 2; // seconds
+$TAIL_BUFFER = 8192; // 8KB
+$dateFormat = 'Y-m-d H:i:s'; // date format in the log file
 
-function tailCustom($filepath, $lines = 1, $adaptive = true)
-{
+function tailCustom($filepath, $lines = 1, $adaptive = true) {
     $f = @fopen($filepath, "rb");
     if ($f === false) return false;
 
@@ -18,8 +18,6 @@ function tailCustom($filepath, $lines = 1, $adaptive = true)
     if (fread($f, 1) != "\n") $lines -= 1;
 
     $output = '';
-    $chunk = '';
-
     while (ftell($f) > 0 && $lines >= 0) {
         $seek = min(ftell($f), $buffer);
         fseek($f, -$seek, SEEK_CUR);
@@ -36,8 +34,7 @@ function tailCustom($filepath, $lines = 1, $adaptive = true)
     return trim($output);
 }
 
-function formatDuration($seconds)
-{
+function formatDuration($seconds) {
     if ($seconds >= 60) {
         $minutes = floor($seconds / 60);
         $remaining = $seconds % 60;
@@ -46,75 +43,118 @@ function formatDuration($seconds)
     return sprintf("%ds", $seconds);
 }
 
-function tgColor($tg)
-{
+function tgColor($tg) {
     $hue = crc32($tg) % 360;
     return "hsl($hue,70%,50%)";
 }
 
-// Process log data
-$logContent = tailCustom($LOG_FILE, $LINES, true);
-$linesArray = explode("\n", $logContent);
-$durations = [];
-$activeStarts = [];
-$completedStarts = [];
+function generateLogHtml() {
+    global $LOG_FILE, $LINES, $dateFormat;
 
-foreach (array_reverse($linesArray) as $i => $line) {
-    $originalIndex = count($linesArray) - 1 - $i;
+    $logContent = tailCustom($LOG_FILE, $LINES, true);
+    $linesArray = explode("\n", $logContent);
+    $durations = [];
+    $activeStarts = [];
+    $completedStarts = [];
 
-    if (strlen($line) < 21) continue;
+    foreach (array_reverse($linesArray) as $i => $line) {
+        $originalIndex = count($linesArray) - 1 - $i;
+        if (strlen($line) < 21) continue;
 
-    $message = substr($line, 21);
-    $timestamp = substr($line, 0, 19);
+        $message = substr($line, 21);
+        $timestamp = substr($line, 0, 19);
 
-    if (preg_match('/ReflectorLogic: Talker stop on TG #(\d+): (.+)$/', $message, $matches)) {
-        // Look forward in time (backward in array) for matching start
-        for ($j = $originalIndex - 1; $j >= 0; $j--) {
-            $prevMessage = substr($linesArray[$j], 21);
-            if (preg_match('/ReflectorLogic: Talker start on TG #(\d+): (.+)$/', $prevMessage, $startMatches)) {
-                if ($startMatches[1] == $matches[1] && $startMatches[2] == $matches[2]) {
-                    $startTime = DateTime::createFromFormat('d.m.Y H:i:s', substr($linesArray[$j], 0, 19));
-                    $stopTime = DateTime::createFromFormat('d.m.Y H:i:s', $timestamp);
-                    if ($startTime && $stopTime) {
-                        $duration = $stopTime->getTimestamp() - $startTime->getTimestamp();
-                        $durations[$originalIndex] = formatDuration($duration);
-                        $completedStarts[$j] = true;
+        if (preg_match('/ReflectorLogic: Talker stop on TG #(\d+): (.+)$/', $message, $matches)) {
+            for ($j = $originalIndex - 1; $j >= 0; $j--) {
+                $prevMessage = substr($linesArray[$j], 21);
+                if (preg_match('/ReflectorLogic: Talker start on TG #(\d+): (.+)$/', $prevMessage, $startMatches)) {
+                    if ($startMatches[1] == $matches[1] && $startMatches[2] == $matches[2]) {
+                        $startTime = DateTime::createFromFormat($dateFormat, substr($linesArray[$j], 0, 19));
+                        $stopTime = DateTime::createFromFormat($dateFormat, $timestamp);
+                        if ($startTime && $stopTime) {
+                            $duration = $stopTime->getTimestamp() - $startTime->getTimestamp();
+                            $durations[$originalIndex] = formatDuration($duration);
+                            $completedStarts[$j] = true;
+                        }
+                        break;
                     }
-                    break;
                 }
             }
         }
     }
+
+    foreach ($linesArray as $j => $line) {
+        if (isset($completedStarts[$j])) continue;
+        if (preg_match('/ReflectorLogic: Talker start on TG #(\d+): (.+)$/', substr($line, 21))) {
+            $activeStarts[$j] = true;
+        }
+    }
+
+    ob_start();
+    foreach (array_reverse($linesArray, true) as $j => $line):
+        if (strlen($line) < 21) continue;
+
+        $message = substr($line, 21);
+        $isTalkerStart = strpos($message, 'ReflectorLogic: Talker start') === 0;
+        $isTalkerStop = strpos($message, 'ReflectorLogic: Talker stop') === 0;
+        $hasDuration = isset($durations[$j]);
+        $isActive = isset($activeStarts[$j]);
+
+        $formattedLine = preg_replace_callback(
+            '/TG #(\d+)/',
+            function ($m) {
+                return '<span style="background-color:' . tgColor($m[1]) . '" class="font-bold">TG #' . $m[1] . '</span>';
+            },
+            htmlspecialchars($line)
+        );
+
+        $formattedLine = preg_replace_callback(
+            '/: ([A-Z0-9]+)$/',
+            function ($m) {
+                return ': <span style="background-color:' . tgColor($m[1]) . '" class="font-bold px-1">' . $m[1] . '</span>';
+            },
+            $formattedLine
+        );
+        ?>
+        <div class="<?= $isTalkerStart ? 'bg-green-900/20' : '' ?>
+            <?= $isTalkerStop ? 'bg-gray-700/30' : '' ?>
+            border-b border-gray-700 p-3 font-mono text-sm
+            text-gray-300 hover:bg-gray-700/20 transition-colors
+            flex justify-between items-center">
+            <span class="flex-1"><?= $formattedLine ?></span>
+            <?php if ($hasDuration): ?>
+                <span class="text-green-400 text-xs bg-green-900/30 px-2 py-1 rounded ml-4">
+                    <?= $durations[$j] ?>
+                </span>
+            <?php elseif ($isActive): ?>
+                <span class="text-green-400 text-xs blink px-2 py-1">
+                    ACTIVE
+                </span>
+            <?php endif; ?>
+        </div>
+    <?php endforeach;
+    return ob_get_clean();
 }
 
-// Identify active transmissions (starts without stops)
-foreach ($linesArray as $j => $line) {
-    if (isset($completedStarts[$j])) continue;
-    if (preg_match('/ReflectorLogic: Talker start on TG #(\d+): (.+)$/', substr($line, 21))) {
-        $activeStarts[$j] = true;
-    }
+if (isset($_GET['ajax'])) {
+    header('Content-Type: text/html');
+    echo generateLogHtml();
+    exit;
 }
 ?>
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <title>SS-DASH - SvxLink Monitor</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <meta http-equiv="refresh" content="<?= $REFRESH ?>">
     <style>
         .blink {
             animation: blink 1.5s ease-in-out infinite;
         }
-
         @keyframes blink {
-            50% {
-                opacity: 0.4;
-            }
+            50% { opacity: 0.4; }
         }
-
-        .log-container {
-            height: 90vh;
-        }
+        .log-container { height: 90vh; }
     </style>
 </head>
 <body class="bg-gray-900 h-screen overflow-hidden">
@@ -124,56 +164,27 @@ foreach ($linesArray as $j => $line) {
     </h1>
 
     <div class="log-container bg-gray-800 rounded-lg border border-green-400 overflow-y-auto">
-        <?php foreach (array_reverse($linesArray, true) as $j => $line):
-            if (strlen($line) < 21) continue;
-
-            $message = substr($line, 21);
-            $isTalkerStart = strpos($message, 'ReflectorLogic: Talker start') === 0;
-            $isTalkerStop = strpos($message, 'ReflectorLogic: Talker stop') === 0;
-            $hasDuration = isset($durations[$j]);
-            $isActive = isset($activeStarts[$j]);
-
-            $formattedLine = preg_replace_callback(
-                '/TG #(\d+)/',
-                function ($m) {
-                    return '<span style="background-color:' . tgColor($m[1]) . '" class="font-bold">TG #' . $m[1] . '</span>';
-                },
-                htmlspecialchars($line)
-            );
-
-            $formattedLine = preg_replace_callback(
-                '/: ([A-Z0-9]+)$/',
-                function ($m) {
-                    return ': <span style="background-color:' . tgColor($m[1]) . '" class="font-bold px-1">' . $m[1] . '</span>';
-                },
-                $formattedLine
-            );
-
-            ?>
-            <div class="<?= $isTalkerStart ? 'bg-green-900/20' : '' ?>
-                <?= $isTalkerStop ? 'bg-gray-700/30' : '' ?>
-                border-b border-gray-700 p-3 font-mono text-sm
-                text-gray-300 hover:bg-gray-700/20 transition-colors
-                flex justify-between items-center">
-
-                <span class="flex-1"><?= $formattedLine ?></span>
-
-                <?php if ($hasDuration): ?>
-                    <span class="text-green-400 text-xs bg-green-900/30 px-2 py-1 rounded ml-4">
-                        <?= $durations[$j] ?>
-                    </span>
-                <?php elseif ($isActive): ?>
-                    <span class="text-green-400 text-xs blink px-2 py-1">
-                        ACTIVE
-                    </span>
-                <?php endif; ?>
-            </div>
-        <?php endforeach; ?>
+        <?= generateLogHtml() ?>
     </div>
 
     <div class="mt-4 text-gray-500 text-xs font-mono">
         Auto-refresh: <?= $REFRESH ?>s | Log lines: <?= $LINES ?> | Buffer: <?= $TAIL_BUFFER ?>
     </div>
 </div>
+<script>
+    function updateLogs() {
+        fetch('?ajax=1')
+            .then(response => response.text())
+            .then(html => {
+                document.querySelector('.log-container').innerHTML = html;
+            })
+            .catch(error => console.error('Error fetching logs:', error));
+    }
+
+    // Update every <?= $REFRESH ?> seconds
+    setInterval(updateLogs, <?= $REFRESH * 1000 ?>);
+    // Initial load
+    updateLogs();
+</script>
 </body>
 </html>
