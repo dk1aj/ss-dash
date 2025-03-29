@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>SS-DASH - SvxLink Monitor</title>
+    <!-- AlpineJS -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+    <!-- TailwindCSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Flowbite -->
+    <link rel="stylesheet" href="https://unpkg.com/flowbite@1.6.5/dist/flowbite.min.css" />
+    <script defer src="https://unpkg.com/flowbite@1.6.5/dist/flowbite.js"></script>
+    <style>
+        .blink { animation: blink 1.5s ease-in-out infinite; }
+        @keyframes blink { 50% { opacity: 0.4; } }
+        .log-container { height: min(90vh, 800px); }
+        .control-btn { transition: all 0.2s ease; }
+    </style>
+</head>
+<body class="bg-gray-900 h-screen overflow-hidden">
+<div x-data="app()" class="container mx-auto p-4 h-full flex flex-col gap-4" x-init="init()">
+
+    <!-- Confirmation Dialog -->
+    <template x-if="showConfirmation">
+        <div class="fixed inset-0 flex items-center justify-center bg-black/50 p-4">
+            <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full" role="dialog" aria-modal="true">
+                <h3 class="text-lg font-bold text-red-400 mb-4" x-text="`Confirm ${pendingAction}?`"></h3>
+                <p class="text-gray-300 mb-6">This action cannot be undone. Are you sure?</p>
+                <div class="flex justify-end gap-3">
+                    <button @click="showConfirmation = false" type="button"
+                            class="px-4 py-2 text-gray-400 hover:text-white rounded-lg border border-gray-500 hover:border-white">
+                        Cancel
+                    </button>
+                    <button @click="executeConfirmedCommand" type="button"
+                            class="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-medium rounded-lg">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+    </template>
+
+    <!-- Header -->
+    <header class="flex items-center justify-between gap-4 flex-wrap">
+        <h1 class="text-2xl text-green-400 font-mono">
+            SS-DASH :: Talker Activity Monitor
+        </h1>
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-2 text-sm text-gray-400">
+                <span class="h-3 w-3 rounded-full bg-green-500 animate-pulse"></span>
+                <span x-text="pttActive ? 'PTT ACTIVE' : 'PTT READY'"></span>
+            </div>
+            <div class="flex gap-2 items-center">
+                <button @click="togglePtt()" :class="pttActive ? 'bg-green-600' : 'bg-gray-700 hover:bg-gray-600'"
+                        class="control-btn text-white px-4 py-2 rounded-lg" :disabled="loading" title="Push-to-Talk Toggle">
+                    <span x-show="!loading" x-text="pttActive ? '🎤 Release' : '🎤 Press'"></span>
+                    <svg x-show="loading" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg"
+                         fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10"
+                                stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2
+                                 5.291A7.962 7.962 0 014 12H0c0 3.042
+                                 1.135 5.824 3 7.938l3-2.647z">
+                        </path>
+                    </svg>
+                </button>
+                <div class="flex gap-2 border-l border-gray-700 pl-2">
+                    <button @click="confirmAction('restart', '🔄 Restart Svxlink')"
+                            class="control-btn bg-purple-600 hover:bg-purple-500 text-white p-2 rounded-lg"
+                            title="Restart Service">
+                        🔄
+                    </button>
+                    <button @click="confirmAction('stop', '⏹ Stop Svxlink')"
+                            class="control-btn bg-red-600 hover:bg-red-500 text-white p-2 rounded-lg"
+                            title="Stop Service">
+                        ⏹
+                    </button>
+                    <button @click="confirmAction('reboot', '🔃 Reboot System')"
+                            class="control-btn bg-orange-600 hover:bg-orange-500 text-white p-2 rounded-lg"
+                            title="Reboot System">
+                        🔃
+                    </button>
+                    <button @click="confirmAction('shutdown', '⏻ Shutdown System')"
+                            class="control-btn bg-red-700 hover:bg-red-600 text-white p-2 rounded-lg"
+                            title="Shutdown System">
+                        ⏻
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- DTMF Form -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+        <form @submit.prevent="sendDtmf()" class="bg-gray-800 p-4 rounded-lg">
+            <div class="flex items-center gap-2">
+                <input type="text" x-model="dtmf" placeholder="Enter DTMF code"
+                       class="flex-1 bg-gray-700 text-white px-4 py-1 rounded"
+                       maxlength="10" :disabled="loading" />
+                <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1 rounded" :disabled="loading">
+                    ➤
+                </button>
+            </div>
+            <div x-show="error" class="text-red-400 text-sm mt-2" x-text="error"></div>
+        </form>
+    </div>
+
+    <!-- Log Container -->
+    <div class="log-container bg-gray-800 rounded-lg border border-green-400 overflow-y-auto"></div>
+
+    <!-- Footer -->
+    <footer class="text-gray-500 text-xs font-mono flex justify-between items-center">
+        <div>
+            Copyright YO6SAY
+        </div>
+        <div x-text="status"></div>
+    </footer>
+</div>
+
+<script>
+    function app() {
+        return {
+            pttActive: false,
+            dtmf: '',
+            loading: false,
+            error: null,
+            status: 'Connected',
+            showConfirmation: false,
+            pendingAction: null,
+            pendingCommand: null,
+            intervalId: null,
+
+            init() {
+                if (this.intervalId) clearInterval(this.intervalId);
+                this.intervalId = setInterval(() => {
+                    this.fetchLogLines();
+                    this.status = `Last update: ${new Date().toLocaleTimeString()}`;
+                }, 1000);
+
+                // Initial load
+                this.fetchLogLines();
+            },
+
+            confirmAction(command, actionLabel) {
+                this.pendingCommand = command;
+                this.pendingAction = actionLabel;
+                this.showConfirmation = true;
+            },
+
+            async executeConfirmedCommand() {
+                this.showConfirmation = false;
+                try {
+                    this.loading = true;
+                    await this.systemAction(this.pendingCommand);
+                } catch (err) {
+                    this.error = err.message;
+                    setTimeout(() => this.error = null, 3000);
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            // Fetch JSON log from /api.php?endpoint=log&lines=30
+            async fetchLogLines() {
+                try {
+                    const response = await fetch('/api.php?endpoint=log&lines=30');
+                    if (!response.ok) {
+                        throw new Error(`Log fetch failed: ${response.status}`);
+                    }
+                    const data = await response.json();
+                    if (!data.logEntries) {
+                        document.querySelector('.log-container').innerHTML =
+                            '<div class="p-3 text-gray-400">No log data.</div>';
+                        return;
+                    }
+
+                    // Build HTML in reverse order (newest lines first)
+                    let html = '';
+                    const entries = data.logEntries;
+                    for (let i = entries.length - 1; i >= 0; i--) {
+                        const e = entries[i];
+                        html += this.formatLogLine(e);
+                    }
+                    document.querySelector('.log-container').innerHTML = html;
+
+                } catch (err) {
+                    console.error('Log update failed:', err);
+                }
+            },
+
+            // Toggle PTT with POST /api.php?endpoint=ptt and JSON { ptt: "0" or "1" }
+            async togglePtt() {
+                try {
+                    this.loading = true;
+                    const pttValue = this.pttActive ? '0' : '1';
+                    const response = await fetch('/api.php?endpoint=ptt', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ptt: pttValue })
+                    });
+
+                    // Check if the API returned an error
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        throw new Error(errData.error || 'PTT action failed');
+                    }
+
+                    // If it’s successful, flip local state
+                    this.pttActive = !this.pttActive;
+
+                } catch (err) {
+                    this.error = err.message;
+                    setTimeout(() => this.error = null, 3000);
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            // Send DTMF with POST /api.php?endpoint=dtmf and JSON { dtmf: "..." }
+            async sendDtmf() {
+                if (!this.dtmf) return;
+                try {
+                    this.loading = true;
+                    const response = await fetch('/api.php?endpoint=dtmf', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ dtmf: this.dtmf })
+                    });
+
+                    if (!response.ok) {
+                        const errData = await response.json();
+                        throw new Error(errData.error || 'DTMF action failed');
+                    }
+
+                    // Clear input if success
+                    this.dtmf = '';
+
+                } catch (err) {
+                    this.error = err.message;
+                    setTimeout(() => this.error = null, 3000);
+                } finally {
+                    this.loading = false;
+                }
+            },
+
+            // Restart / Stop / Reboot / Shutdown
+            async systemAction(action) {
+                const valid = ['restart', 'stop', 'shutdown', 'reboot'];
+                if (!valid.includes(action)) {
+                    throw new Error('Invalid system action');
+                }
+                const response = await fetch(`/api.php?endpoint=${action}`, {
+                    method: 'POST'
+                });
+
+                // Check if the API returned an error
+                if (!response.ok) {
+                    const errData = await response.json();
+                    throw new Error(errData.error || 'System action failed');
+                }
+            },
+
+            // Build log line HTML
+            formatLogLine(entry) {
+                const rawMsg    = entry.message;
+                const timestamp = entry.timestamp;
+                const duration  = entry.duration;
+                const active    = entry.active;
+
+                const isStart = rawMsg.startsWith('ReflectorLogic: Talker start');
+                const isStop  = rawMsg.startsWith('ReflectorLogic: Talker stop');
+
+                const baseClasses = [
+                    'border-b', 'border-gray-700', 'p-3', 'font-mono',
+                    'text-sm', 'text-gray-300', 'hover:bg-gray-700/20',
+                    'transition-colors', 'flex', 'justify-between', 'items-center'
+                ];
+                if (isStart) {
+                    baseClasses.push('bg-green-900/20');
+                } else if (isStop) {
+                    baseClasses.push('bg-gray-700/30');
+                }
+
+                let formattedMsg = this.highlightTgAndCallsign(rawMsg);
+                let durationHtml = '';
+                if (duration) {
+                    durationHtml = `<span class="text-green-400 text-xs bg-green-900/30 px-2 py-1 rounded ml-4">${duration}</span>`;
+                } else if (active) {
+                    durationHtml = `<span class="text-green-400 text-xs blink px-2 py-1">ACTIVE</span>`;
+                }
+
+                return `
+<div class="${baseClasses.join(' ')}">
+  <span class="flex-1">
+    ${this.escapeHtml(timestamp)}
+    ${formattedMsg}
+  </span>
+  ${durationHtml}
+</div>`;
+            },
+
+            // Highlight TG # and callsign with colored backgrounds
+            highlightTgAndCallsign(message) {
+                let safe = this.escapeHtml(message);
+                safe = safe.replace(/TG #(\d+)/g, (m, tg) => {
+                    return `<span style="background-color:${this.tgColor(tg)}" class="font-bold">TG #${tg}</span>`;
+                });
+                safe = safe.replace(/: ([A-Z0-9]+)$/g, (m, cs) => {
+                    return `: <span style="background-color:${this.tgColor(cs)}" class="font-bold px-1">${cs}</span>`;
+                });
+                return safe;
+            },
+
+            tgColor(str) {
+                const hue = Math.abs(this.hashString(str)) % 360;
+                return `hsl(${hue},70%,40%)`;
+            },
+
+            hashString(str) {
+                let hash = 0, i, chr;
+                for (i = 0; i < str.length; i++) {
+                    chr   = str.charCodeAt(i);
+                    hash  = ((hash << 5) - hash) + chr;
+                    hash |= 0;
+                }
+                return hash;
+            },
+
+            escapeHtml(html) {
+                return html
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+        }
+    }
+</script>
+</body>
+</html>
