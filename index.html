@@ -267,11 +267,13 @@
                 }
             },
 
-            // Toggle PTT with POST /api.php?endpoint=ptt and JSON { ptt: "0" or "1" }
+            // Toggle PTT with POST /api.php?endpoint=ptt and JSON { ptt: "O" or "Z" }
+            // O = Open squelch for transmission
+            // Z = Close squelch for reception
             async togglePtt() {
                 try {
                     this.loading = true;
-                    const pttValue = this.pttActive ? '0' : '1';
+                    const pttValue = this.pttActive ? 'Z' : 'O';
                     const response = await fetch('/api.php?endpoint=ptt', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
