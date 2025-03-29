@@ -3,7 +3,7 @@
  * SS-DASH Configuration
  */
 date_default_timezone_set('Europe/Bucharest'); // Set your timezone
-define('LOG_FILE', './misu2');
+define('LOG_FILE', '/opt/rolink/var/log/svxlink');
 define('DEFAULT_LOG_LINES', 30);
 define('TAIL_BUFFER', 8192);
 define('DTMF_CONTROL_PTY', '/dev/shm/svxlink_dtmf_ctrl');

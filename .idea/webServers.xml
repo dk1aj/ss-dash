@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="ee6002a5-3130-43a8-bccd-995a7c4926ef" name="svxlink">
+        <fileTransfer accessType="SFTP" host="svxlink.local" port="22" sshConfigId="a30654aa-0c07-47c7-a1f6-43c1b39ddec4" sshConfig="pi@svxlink.local:22 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

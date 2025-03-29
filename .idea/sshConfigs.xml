@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SshConfigs">
+    <configs>
+      <sshConfig authType="PASSWORD" host="svxlink.local" id="a30654aa-0c07-47c7-a1f6-43c1b39ddec4" port="22" nameFormat="DESCRIPTIVE" username="pi" useOpenSSHConfig="true" />
+    </configs>
+  </component>
+</project>
