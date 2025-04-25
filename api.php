@@ -9,6 +9,7 @@ define('TAIL_BUFFER', 8192);
 define('DTMF_CONTROL_PTY', '/tmp/dtmf_svx');
 define('PTT_CONTROL_PTY', '/tmp/SQL');
 define('DATE_FORMATS', serialize(['Y-m-d H:i:s', 'd.m.Y H:i:s', 'Y/m/d H:i:s']));
+define('MY_CALLSIGN', 'YO6SAY'); // Replace with your callsign
 
 /**
  * Parse the request method and endpoint from query parameters.
@@ -63,6 +64,15 @@ switch ($requestMethod) {
  *          HANDLERS
  * ==============================
  */
+
+/**
+ * TODO:
+ * Check if I am in TX mode based on my own callsign.
+ * For example, if I am in TX mode, I will be the first in the list.
+ * Log example:
+ * 2025-03-29 19:15:48 ReflectorLogic: Talker start on TG #1337: YO6SAY-M
+ */
+
 
 /**
  * GET /api.php?endpoint=log&lines=XX
