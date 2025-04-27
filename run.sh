@@ -1,15 +1,15 @@
 #!/bin/bash
 
-# This function will be called when the script receives Ctrl+C (SIGINT)
 cleanup() {
     echo "Stopping background processes..."
-    # Kills the last background job (the Go process)
-    kill $!
+    kill $GO_PID
 }
 
 trap cleanup SIGINT
 
+# Go-Programm im Hintergrund starten
 go run audio.go &
-# Store the PID if you want more precise control: GO_PID=$!
+GO_PID=$!
 
+# PHP-Server im Vordergrund starten
 php -S 0.0.0.0:8000

@@ -58,26 +58,42 @@
             SS-DASH :: Talker Activity Monitor
         </h1>
         <div class="flex items-center gap-4">
-            <div class="flex items-center gap-2 text-sm text-gray-400">
-                <span class="h-3 w-3 rounded-full bg-green-500 animate-pulse"></span>
-                <span x-text="pttActive ? 'PTT ACTIVE' : 'PTT READY'"></span>
-            </div>
-            <div class="flex gap-2 items-center">
-                <button @click="togglePtt()" :class="pttActive ? 'bg-green-600' : 'bg-gray-700 hover:bg-gray-600'"
-                        class="control-btn text-white px-4 py-2 rounded-lg" :disabled="loading"
-                        title="Push-to-Talk Toggle">
-                    <span x-show="!loading" x-text="pttActive ? '🎤 Release' : '🎤 Press'"></span>
-                    <svg x-show="loading" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg"
-                         fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10"
-                                stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor"
-                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2
-                                 5.291A7.962 7.962 0 014 12H0c0 3.042
-                                 1.135 5.824 3 7.938l3-2.647z">
-                        </path>
-                    </svg>
-                </button>
+
+            <div 
+            class="flex items-center gap-2 text-sm text-gray-400"
+            :class="pttActive ? 'text-red-400' : 'text-gray-400'">
+            <!-- Colored dot: red when PTT is active, green when ready -->
+            <span 
+                class="h-3 w-3 rounded-full animate-pulse"
+                :class="pttActive ? 'bg-red-400' : 'bg-green-500'">
+            </span>
+            <!-- Dynamic text: shows "PTT ACTIVE" or "PTT READY" -->
+            <span x-text="pttActive ? 'PTT ACTIVE' : 'PTT READY'"></span>
+        </div>
+        
+        <div class="flex gap-2 items-center">
+            <button 
+                @click="togglePtt()"
+                :class="pttActive ? 'bg-red-500 hover:bg-red-600' : 'bg-gray-700 hover:bg-gray-600'"
+                class="control-btn text-white px-4 py-2 rounded-lg"
+                :disabled="loading"
+                title="Push-to-Talk Toggle">
+                <!-- Show text when not loading: "Press" or "Release" -->
+                <span x-show="!loading" x-text="pttActive ? '🎤 Release' : '🎤 Press'"></span>
+                <!-- Show spinner when loading -->
+                <svg x-show="loading" class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2
+                             5.291A7.962 7.962 0 014 12H0c0 3.042
+                             1.135 5.824 3 7.938l3-2.647z">
+                    </path>
+                </svg>
+            </button>
+
+        
+
+
                 <div class="flex gap-2 border-l border-gray-700 pl-2">
                     <button @click="confirmAction('restart', '🔄 Restart Svxlink')"
                             class="control-btn bg-purple-600 hover:bg-purple-500 text-white p-2 rounded-lg"

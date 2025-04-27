@@ -3,13 +3,13 @@
  * SS-DASH Configuration
  */
 date_default_timezone_set('Europe/Bucharest'); // Set your timezone
-define('LOG_FILE', '/opt/rolink/var/log/svxlink');
+define('LOG_FILE', '/var/log/svxlink');
 define('DEFAULT_LOG_LINES', 30);
 define('TAIL_BUFFER', 8192);
 define('DTMF_CONTROL_PTY', '/tmp/dtmf_svx');
 define('PTT_CONTROL_PTY', '/tmp/SQL');
 define('DATE_FORMATS', serialize(['Y-m-d H:i:s', 'd.m.Y H:i:s', 'Y/m/d H:i:s']));
-define('MY_CALLSIGN', 'YO6SAY'); // Replace with your callsign
+define('MY_CALLSIGN', 'DK1AJ'); // Replace with your callsign
 
 /**
  * Parse the request method and endpoint from query parameters.
